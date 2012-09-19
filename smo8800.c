@@ -1,5 +1,5 @@
 /*
- *  smo8800.c - Dell Latitude ACPI SMO8800 accelerometer driver
+ *  smo8800.c - Dell Latitude ACPI SMO8800 freefall sensor driver
  *
  *  Copyright (C) 2012 Sonal Santan < sonal DOT santan AT gmail DOT com >
  *  
@@ -28,6 +28,7 @@
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 #include <linux/interrupt.h>
+#include <linux/miscdevice.h>
 
 #define DRIVER_NAME     "DELL ACPI SMO8800 Driver"
 
@@ -35,11 +36,18 @@ static int smo8800_add(struct acpi_device *device);
 static int smo8800_remove(struct acpi_device *device, int type);
 static int smo8800_suspend(struct acpi_device *device, pm_message_t state);
 static int smo8800_resume(struct acpi_device *device);
+static int smo8800_misc_open(struct inode *inode, struct file *file);
+static int smo8800_misc_release(struct inode *inode, struct file *file);
+static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
+                                size_t count, loff_t *pos);
 
 struct smo8800 {
         void		*bus_priv; 
         u32		irq;   
         atomic_t	count;     /* interrupt count after last read */
+        struct miscdevice	miscdev;
+	unsigned long		misc_opened; /* whether the device is open */
+	wait_queue_head_t	misc_wait; /* Wait queue for the misc device */
 };
 
 
@@ -64,6 +72,91 @@ static struct acpi_driver latitude_acc_driver = {
         },
         .owner =	THIS_MODULE,
 };
+
+
+static const struct file_operations smo8800_misc_fops = {
+	.owner   = THIS_MODULE,
+	.read    = smo8800_misc_read,
+	.open    = smo8800_misc_open,
+	.release = smo8800_misc_release,
+};
+
+
+static int smo8800_misc_open(struct inode *inode, struct file *file)
+{
+	struct smo8800 *smo_data = container_of(file->private_data,
+                                            struct smo8800, miscdev);
+
+	if (test_and_set_bit(0, &smo_data->misc_opened))
+		return -EBUSY; /* already open */
+
+	atomic_set(&smo_data->count, 0);
+	return 0;
+}
+
+static int smo8800_misc_release(struct inode *inode, struct file *file)
+{
+	struct smo8800 *smo_data = container_of(file->private_data,
+					      struct smo8800, miscdev);
+
+	clear_bit(0, &smo_data->misc_opened); /* release the device */
+	return 0;
+}
+
+static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
+                                size_t count, loff_t *pos)
+{
+	struct smo8800 *smo_data = container_of(file->private_data,
+                                            struct smo8800, miscdev);
+
+	DECLARE_WAITQUEUE(wait, current);
+	u32 data;
+	unsigned char byte_data;
+	ssize_t retval = 1;
+
+	if (count < 1)
+		return -EINVAL;
+
+        add_wait_queue(&smo_data->misc_wait, &wait);
+	while (true) {
+		set_current_state(TASK_INTERRUPTIBLE);
+                printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count);    
+		data = atomic_xchg(&smo_data->count, 0);
+                printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data);    
+		if (data) {
+			break;
+                }
+
+		if (file->f_flags & O_NONBLOCK) {
+			retval = -EAGAIN;
+			goto out;
+		}
+
+		if (signal_pending(current)) {
+			retval = -ERESTARTSYS;
+			goto out;
+		}
+
+		schedule();
+	}
+
+	if (data < 255)
+		byte_data = data;
+	else
+		byte_data = 255;
+
+	/* make sure we are not going into copy_to_user() with
+	 * TASK_INTERRUPTIBLE state */
+	set_current_state(TASK_RUNNING);
+	if (copy_to_user(buf, &byte_data, sizeof(byte_data)))
+		retval = -EFAULT;
+
+out:
+	__set_current_state(TASK_RUNNING);
+        remove_wait_queue(&smo_data->misc_wait, &wait);
+
+	return retval;
+}
 
 static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
 {
@@ -142,6 +235,13 @@ static int __init smo8800_init(void)
                 return -ENODEV;
         }
 
+	smo8800_dev.miscdev.minor	= MISC_DYNAMIC_MINOR;
+	smo8800_dev.miscdev.name	= "freefall";
+	smo8800_dev.miscdev.fops	= &smo8800_misc_fops;
+        init_waitqueue_head(&smo8800_dev.misc_wait);
+	if (misc_register(&smo8800_dev.miscdev))
+                pr_err("misc_register failed\n");
+
         return 0;
 }
 
@@ -149,6 +249,7 @@ static int smo8800_remove(struct acpi_device *device, int type)
 {
         if (smo8800_dev.irq)
                 free_irq(smo8800_dev.irq, &smo8800_dev);
+        misc_deregister(&smo8800_dev.miscdev);
         return 0;
 }
 
