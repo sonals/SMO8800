@@ -2,13 +2,18 @@
 # Makefile for sensor chip drivers.
 #
 
-obj-m += smo8800.o
+obj-m	:= smo8800.o
 
-KDIR := /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
+PWD	:= $(shell pwd)
+KDIR	:= /lib/modules/$(shell uname -r)/build
 
-default:
-	$(MAKE) -C $(KDIR) M=$(PWD) V=1 modules
+all:
+	make -C $(KDIR) M=$(PWD) modules
 
+clean:
+	rm -f *~ Module.symvers Module.markers modules.order
+	make -C $(KDIR) M=$(PWD) clean
 
-
+install: all
+	make -C $(KDIR) M=$(PWD) modules_install
+	depmod -a
