@@ -2,10 +2,6 @@
  *  smo8800.c - Dell Latitude ACPI SMO8800 freefall sensor driver
  *
  *  Copyright (C) 2012 Sonal Santan < sonal DOT santan AT gmail DOT com >
- *  
- *  DELL Latitude laptops come with a The HardDisk Active Protection System (hdaps) is present in IBM ThinkPads
- *  starting with the R40, T41, and X40.  It provides a basic two-axis
- *  accelerometer and other data, such as the device's temperature.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
