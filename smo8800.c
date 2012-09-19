@@ -158,6 +158,7 @@ static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
 {
 	struct smo8800 *smo = data;
 	atomic_inc(&smo->count);
+	wake_up_interruptible(&smo->misc_wait);
 	return IRQ_WAKE_THREAD;
 }
 
