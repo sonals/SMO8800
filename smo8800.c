@@ -3,6 +3,8 @@
  *
  *  Copyright (C) 2012 Sonal Santan < sonal DOT santan AT gmail DOT com >
  *
+ *  This is loosely based on lis3lv02d driver.
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -26,7 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/miscdevice.h>
 
-#define DRIVER_NAME     "DELL ACPI SMO8800 Driver"
+#define DRIVER_NAME	"DELL ACPI SMO8800 Driver"
 
 static int smo8800_add(struct acpi_device *device);
 static int smo8800_remove(struct acpi_device *device, int type);
@@ -35,13 +37,13 @@ static int smo8800_resume(struct acpi_device *device);
 static int smo8800_misc_open(struct inode *inode, struct file *file);
 static int smo8800_misc_release(struct inode *inode, struct file *file);
 static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
-                                size_t count, loff_t *pos);
+				 size_t count, loff_t *pos);
 
 struct smo8800 {
-        void		*bus_priv; 
-        u32		irq;   
-        atomic_t	count;     /* interrupt count after last read */
-        struct miscdevice	miscdev;
+	void			*bus_priv;
+	u32			irq;
+	atomic_t		count;	   /* interrupt count after last read */
+	struct miscdevice	miscdev;
 	unsigned long		misc_opened; /* whether the device is open */
 	wait_queue_head_t	misc_wait; /* Wait queue for the misc device */
 };
@@ -50,30 +52,30 @@ struct smo8800 {
 struct smo8800 smo8800_dev;
 
 static const struct acpi_device_id acc_device_ids[] = {
-        { "SMO8800", 0},
-        { "", 0},
+	{ "SMO8800", 0},
+	{ "", 0},
 };
 
 MODULE_DEVICE_TABLE(acpi, acc_device_ids);
 
 static struct acpi_driver latitude_acc_driver = {
-        .name =         DRIVER_NAME,
-        .class =        "Latitude",
-        .ids =          acc_device_ids,
-        .ops =          {
-                .add =          smo8800_add,
-                .remove =       smo8800_remove,
-                .suspend =      smo8800_suspend,
-                .resume  =      smo8800_resume,
-        },
-        .owner =	THIS_MODULE,
+	.name =		DRIVER_NAME,
+	.class =	"Latitude",
+	.ids =		acc_device_ids,
+	.ops =		{
+		.add =		smo8800_add,
+		.remove =	smo8800_remove,
+		.suspend =	smo8800_suspend,
+		.resume	 =	smo8800_resume,
+	},
+	.owner =	THIS_MODULE,
 };
 
 
 static const struct file_operations smo8800_misc_fops = {
-	.owner   = THIS_MODULE,
-	.read    = smo8800_misc_read,
-	.open    = smo8800_misc_open,
+	.owner	 = THIS_MODULE,
+	.read	 = smo8800_misc_read,
+	.open	 = smo8800_misc_open,
 	.release = smo8800_misc_release,
 };
 
@@ -81,7 +83,7 @@ static const struct file_operations smo8800_misc_fops = {
 static int smo8800_misc_open(struct inode *inode, struct file *file)
 {
 	struct smo8800 *smo_data = container_of(file->private_data,
-                                            struct smo8800, miscdev);
+						struct smo8800, miscdev);
 
 	if (test_and_set_bit(0, &smo_data->misc_opened))
 		return -EBUSY; /* already open */
@@ -93,17 +95,17 @@ static int smo8800_misc_open(struct inode *inode, struct file *file)
 static int smo8800_misc_release(struct inode *inode, struct file *file)
 {
 	struct smo8800 *smo_data = container_of(file->private_data,
-					      struct smo8800, miscdev);
+						struct smo8800, miscdev);
 
 	clear_bit(0, &smo_data->misc_opened); /* release the device */
 	return 0;
 }
 
 static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
-                                size_t count, loff_t *pos)
+				 size_t count, loff_t *pos)
 {
 	struct smo8800 *smo_data = container_of(file->private_data,
-                                            struct smo8800, miscdev);
+						struct smo8800, miscdev);
 
 	DECLARE_WAITQUEUE(wait, current);
 	u32 data;
@@ -113,15 +115,15 @@ static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
 	if (count < 1)
 		return -EINVAL;
 
-        add_wait_queue(&smo_data->misc_wait, &wait);
+	add_wait_queue(&smo_data->misc_wait, &wait);
 	while (true) {
 		set_current_state(TASK_INTERRUPTIBLE);
-                printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count);    
+		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count);
 		data = atomic_xchg(&smo_data->count, 0);
-                printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data);    
+		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data);
 		if (data) {
 			break;
-                }
+		}
 
 		if (file->f_flags & O_NONBLOCK) {
 			retval = -EAGAIN;
@@ -149,7 +151,7 @@ static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
 
 out:
 	__set_current_state(TASK_RUNNING);
-        remove_wait_queue(&smo_data->misc_wait, &wait);
+	remove_wait_queue(&smo_data->misc_wait, &wait);
 
 	return retval;
 }
@@ -166,8 +168,8 @@ static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
 static irqreturn_t smo8800_interrupt_thread(int irq, void *data)
 {
 	struct smo8800 *smo = data;
-        printk(KERN_DEBUG DRIVER_NAME ": Interrupt count %d\n", smo->count);
-        return IRQ_HANDLED;
+	printk(KERN_DEBUG DRIVER_NAME ": Interrupt count %d\n", smo->count);
+	return IRQ_HANDLED;
 }
 
 static acpi_status smo8800_get_resource(struct acpi_resource *resource, void *context)
@@ -188,77 +190,77 @@ static void smo8800_enum_resources(struct acpi_device *device)
 	acpi_status status;
 
 	status = acpi_walk_resources(device->handle, METHOD_NAME__CRS,
-                                     smo8800_get_resource, &smo8800_dev.irq);
+				     smo8800_get_resource, &smo8800_dev.irq);
 	if (ACPI_FAILURE(status))
 		printk(KERN_DEBUG DRIVER_NAME ": Error getting resources\n");
 }
 
 static int smo8800_add(struct acpi_device *device)
 {
-        int err;
-        if (!device)
-                return -EINVAL;
-        smo8800_dev.bus_priv = device;
-        atomic_set(&smo8800_dev.count, 0);
-        device->driver_data = &smo8800_dev;
-        err = 0;
+	int err;
+	if (!device)
+		return -EINVAL;
+	smo8800_dev.bus_priv = device;
+	atomic_set(&smo8800_dev.count, 0);
+	device->driver_data = &smo8800_dev;
+	err = 0;
 
-        smo8800_enum_resources(device);
+	smo8800_enum_resources(device);
 
-        if (!smo8800_dev.irq) {
-                printk(KERN_DEBUG DRIVER_NAME "No IRQ. Disabling /dev/freefall\n");
-                goto out;
-        }
+	if (!smo8800_dev.irq) {
+		printk(KERN_DEBUG DRIVER_NAME "No IRQ. Disabling /dev/freefall\n");
+		goto out;
+	}
 
-        printk(KERN_DEBUG DRIVER_NAME ": IRQ %d\n", smo8800_dev.irq);    
+	printk(KERN_DEBUG DRIVER_NAME ": IRQ %d\n", smo8800_dev.irq);
 
-        err = request_threaded_irq(smo8800_dev.irq, smo8800_interrupt_quick,
-                                   smo8800_interrupt_thread,
-                                   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-                                   DRIVER_NAME, &smo8800_dev);
+	err = request_threaded_irq(smo8800_dev.irq, smo8800_interrupt_quick,
+				   smo8800_interrupt_thread,
+				   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+				   DRIVER_NAME, &smo8800_dev);
 
 out:
-        return err;
+	return err;
 }
 
 static int __init smo8800_init(void)
 {
-        int result = 0;
+	int result = 0;
 
-        result = acpi_bus_register_driver(&latitude_acc_driver);
-        if (result < 0) {
-                ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-                                  "Error registering driver\n"));
-                return -ENODEV;
-        }
+	result = acpi_bus_register_driver(&latitude_acc_driver);
+	if (result < 0) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+				  "Error registering driver\n"));
+		return -ENODEV;
+	}
 
 	smo8800_dev.miscdev.minor	= MISC_DYNAMIC_MINOR;
 	smo8800_dev.miscdev.name	= "freefall";
 	smo8800_dev.miscdev.fops	= &smo8800_misc_fops;
-        init_waitqueue_head(&smo8800_dev.misc_wait);
+	init_waitqueue_head(&smo8800_dev.misc_wait);
 	if (misc_register(&smo8800_dev.miscdev))
-                pr_err("misc_register failed\n");
+		pr_err("misc_register failed\n");
 
-        return 0;
+	return 0;
 }
 
 static int smo8800_remove(struct acpi_device *device, int type)
 {
-        if (smo8800_dev.irq)
-                free_irq(smo8800_dev.irq, &smo8800_dev);
-        misc_deregister(&smo8800_dev.miscdev);
-        return 0;
+	if (smo8800_dev.irq)
+		free_irq(smo8800_dev.irq, &smo8800_dev);
+	misc_deregister(&smo8800_dev.miscdev);
+	return 0;
 }
 
 #ifdef CONFIG_PM
 static int smo8800_suspend(struct acpi_device *device, pm_message_t state)
 {
-        return 0;
+	return 0;
 }
 
 static int smo8800_resume(struct acpi_device *device)
 {
-        return 0;
+	return 0;
 }
 #else
 #define smo8800_suspend NULL
@@ -267,7 +269,7 @@ static int smo8800_resume(struct acpi_device *device)
 
 static void __exit smo8800_exit(void)
 {
-        acpi_bus_unregister_driver(&latitude_acc_driver);
+	acpi_bus_unregister_driver(&latitude_acc_driver);
 }
 
 module_init(smo8800_init);
