@@ -168,7 +168,7 @@ static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
 static irqreturn_t smo8800_interrupt_thread(int irq, void *data)
 {
 	struct smo8800 *smo = data;
-	printk(KERN_DEBUG DRIVER_NAME ": Interrupt count %d\n", smo->count);
+	printk(KERN_DEBUG DRIVER_NAME ": Detected free fall\n");
 	return IRQ_HANDLED;
 }
 
