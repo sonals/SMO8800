@@ -104,7 +104,11 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	daemon(0, 0);
+	if (daemon(0, 0) != 0) {
+		perror("daemon");
+		return EXIT_FAILURE;
+	}
+
 	param.sched_priority = sched_get_priority_max(SCHED_FIFO);
 	sched_setscheduler(0, SCHED_FIFO, &param);
 	mlockall(MCL_CURRENT|MCL_FUTURE);
