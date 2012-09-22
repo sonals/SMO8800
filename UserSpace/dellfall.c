@@ -23,6 +23,7 @@
 
 static char unload_heads_path[64];
 static char device_path[32];
+static const char app_name[] = "DELL FREE FALL";
 
 static int set_unload_heads_path(char *device)
 {
@@ -109,8 +110,8 @@ int main(int argc, char **argv)
 	mlockall(MCL_CURRENT|MCL_FUTURE);
 
 	signal(SIGALRM, ignore_me);
-        openlog("DELL FREE FALL",  LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
-
+        openlog(app_name,  LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+        
 	for (;;) {
 		unsigned char count;
 
