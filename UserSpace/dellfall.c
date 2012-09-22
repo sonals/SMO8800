@@ -19,8 +19,10 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <sched.h>
+#include <syslog.h>
 
-char unload_heads_path[64];
+static char unload_heads_path[64];
+static char device_path[32];
 
 static int set_unload_heads_path(char *device)
 {
@@ -29,6 +31,7 @@ static int set_unload_heads_path(char *device)
 	if (strlen(device) <= 5 || strncmp(device, "/dev/", 5) != 0)
 		return -EINVAL;
 	strncpy(devname, device + 5, sizeof(devname));
+        strncpy(device_path, device, sizeof(device_path));
 
 	snprintf(unload_heads_path, sizeof(unload_heads_path),
                  "/sys/block/%s/device/unload_heads", devname);
@@ -60,6 +63,8 @@ static void write_int(char *path, int i)
 		perror("write");
 		exit(1);
 	}
+        const char *str = (i == 0) ? "Unparked" : "Parked";
+        syslog (LOG_INFO, "%s %s disk head\n", str, device_path);
 	close(fd);
 }
 
@@ -69,7 +74,7 @@ static void protect(int seconds)
 }
 
 
-static void ignore_me(void)
+static void ignore_me(int signum)
 {
 	protect(0);
 }
@@ -104,6 +109,7 @@ int main(int argc, char **argv)
 	mlockall(MCL_CURRENT|MCL_FUTURE);
 
 	signal(SIGALRM, ignore_me);
+        openlog("DELL FREE FALL",  LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 
 	for (;;) {
 		unsigned char count;
@@ -123,7 +129,8 @@ int main(int argc, char **argv)
 		protect(21);
                 alarm(2);
 	}
-
+        
+        closelog();
 	close(fd);
 	return EXIT_SUCCESS;
 }
