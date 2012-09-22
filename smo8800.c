@@ -42,10 +42,10 @@ static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
 struct smo8800 {
 	void			*bus_priv;
 	u32			irq;
-	atomic_t		count;	   /* interrupt count after last read */
-	struct miscdevice	miscdev;
+	atomic_t		count;	     /* interrupt count after last read */
+	struct miscdevice	miscdev;     /* for /dev/freefall */
 	unsigned long		misc_opened; /* whether the device is open */
-	wait_queue_head_t	misc_wait; /* Wait queue for the misc device */
+	wait_queue_head_t	misc_wait;   /* Wait queue for the misc device */
 };
 
 
@@ -118,9 +118,9 @@ static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
 	add_wait_queue(&smo_data->misc_wait, &wait);
 	while (true) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count);
+//		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count);
 		data = atomic_xchg(&smo_data->count, 0);
-		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data);
+//		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data);
 		if (data) {
 			break;
 		}
