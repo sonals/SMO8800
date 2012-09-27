@@ -28,7 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/miscdevice.h>
 
-#define DRIVER_NAME	"DELL ACPI SMO8800 Driver"
+#define DRIVER_NAME	"smo8800"
 
 static int smo8800_add(struct acpi_device *device);
 static int smo8800_remove(struct acpi_device *device, int type);
@@ -167,7 +167,6 @@ static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
 
 static irqreturn_t smo8800_interrupt_thread(int irq, void *data)
 {
-	struct smo8800 *smo = data;
 	printk(KERN_DEBUG DRIVER_NAME ": Detected free fall\n");
 	return IRQ_HANDLED;
 }
@@ -275,6 +274,6 @@ static void __exit smo8800_exit(void)
 module_init(smo8800_init);
 module_exit(smo8800_exit);
 
-MODULE_DESCRIPTION(DRIVER_NAME);
+MODULE_DESCRIPTION("Dell laptop freefall driver (ACPI " DRIVER_NAME ")");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Sonal Santan");
