@@ -32,10 +32,10 @@ static int set_unload_heads_path(char *device)
 	if (strlen(device) <= 5 || strncmp(device, "/dev/", 5) != 0)
 		return -EINVAL;
 	strncpy(devname, device + 5, sizeof(devname));
-        strncpy(device_path, device, sizeof(device_path));
+	strncpy(device_path, device, sizeof(device_path));
 
 	snprintf(unload_heads_path, sizeof(unload_heads_path),
-                 "/sys/block/%s/device/unload_heads", devname);
+		"/sys/block/%s/device/unload_heads", devname);
 	return 0;
 }
 
@@ -64,8 +64,8 @@ static void write_int(char *path, int i)
 		perror("write");
 		exit(1);
 	}
-        const char *str = (i == 0) ? "Unparked" : "Parked";
-        syslog (LOG_INFO, "%s %s disk head\n", str, device_path);
+	const char *str = (i == 0) ? "Unparked" : "Parked";
+	syslog (LOG_INFO, "%s %s disk head\n", str, device_path);
 	close(fd);
 }
 
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 
 	if (ret || !valid_disk()) {
 		fprintf(stderr, "usage: %s <device> (default: /dev/sda)\n",
-                        argv[0]);
+			argv[0]);
 		exit(1);
 	}
 
@@ -114,8 +114,8 @@ int main(int argc, char **argv)
 	mlockall(MCL_CURRENT|MCL_FUTURE);
 
 	signal(SIGALRM, ignore_me);
-        openlog(app_name,  LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
-        
+	openlog(app_name,  LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+ 
 	for (;;) {
 		unsigned char count;
 
@@ -132,10 +132,10 @@ int main(int argc, char **argv)
 		}
 
 		protect(21);
-                alarm(2);
+		alarm(2);
 	}
         
-        closelog();
+	closelog();
 	close(fd);
 	return EXIT_SUCCESS;
 }
