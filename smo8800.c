@@ -65,8 +65,10 @@ static struct acpi_driver latitude_acc_driver = {
 	.ops =		{
 		.add =		smo8800_add,
 		.remove =	smo8800_remove,
+/*
 		.suspend =	smo8800_suspend,
 		.resume	 =	smo8800_resume,
+*/
 	},
 	.owner =	THIS_MODULE,
 };
