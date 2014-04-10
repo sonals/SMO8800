@@ -259,7 +259,6 @@ static int smo8800_remove(struct acpi_device *device, int type)
 {
 	if (smo8800_dev.irq)
 		free_irq(smo8800_dev.irq, &smo8800_dev);
-	misc_deregister(&smo8800_dev.miscdev);
 	return 0;
 }
 
@@ -281,6 +280,7 @@ static int smo8800_resume(struct acpi_device *device)
 static void __exit smo8800_exit(void)
 {
 	acpi_bus_unregister_driver(&latitude_acc_driver);
+	misc_deregister(&smo8800_dev.miscdev);
 }
 
 module_init(smo8800_init);
