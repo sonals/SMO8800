@@ -55,7 +55,7 @@ struct smo8800 {
 };
 
 
-struct smo8800 smo8800_dev;
+static struct smo8800 smo8800_dev;
 
 static const struct acpi_device_id acc_device_ids[] = {
 	{ "SMO8800", 0},
