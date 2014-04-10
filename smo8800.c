@@ -25,68 +25,60 @@
 #include <linux/types.h>
 #include <linux/version.h>
 #include <linux/acpi.h>
-#include <acpi/acpi_bus.h>
-#include <acpi/acpi_drivers.h>
 #include <linux/interrupt.h>
 #include <linux/miscdevice.h>
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 #define DRIVER_NAME	"smo8800"
-
-static int smo8800_add(struct acpi_device *device);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
-static int smo8800_remove(struct acpi_device *device);
-#else
-static int smo8800_remove(struct acpi_device *device, int type);
-#endif
-static int smo8800_suspend(struct acpi_device *device, pm_message_t state);
-static int smo8800_resume(struct acpi_device *device);
-static int smo8800_misc_open(struct inode *inode, struct file *file);
-static int smo8800_misc_release(struct inode *inode, struct file *file);
-static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
-				 size_t count, loff_t *pos);
 
 struct smo8800 {
 	void			*bus_priv;
 	u32			irq;
-	atomic_t		count;	     /* interrupt count after last read */
+	atomic_t		count;       /* interrupt count after last read */
 	struct miscdevice	miscdev;     /* for /dev/freefall */
 	unsigned long		misc_opened; /* whether the device is open */
 	wait_queue_head_t	misc_wait;   /* Wait queue for the misc device */
 };
 
-
 static struct smo8800 smo8800_dev;
 
-static const struct acpi_device_id acc_device_ids[] = {
-	{ "SMO8800", 0},
-	{ "", 0},
-};
+static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
+{
+	struct smo8800 *smo = data;
+	atomic_inc(&smo->count);
+	wake_up_interruptible(&smo->misc_wait);
+	return IRQ_WAKE_THREAD;
+}
 
-MODULE_DEVICE_TABLE(acpi, acc_device_ids);
+static irqreturn_t smo8800_interrupt_thread(int irq, void *data)
+{
+	printk(KERN_DEBUG DRIVER_NAME ": Detected free fall\n");
+	return IRQ_HANDLED;
+}
 
-static struct acpi_driver latitude_acc_driver = {
-	.name =		DRIVER_NAME,
-	.class =	"Latitude",
-	.ids =		acc_device_ids,
-	.ops =		{
-		.add =		smo8800_add,
-		.remove =	smo8800_remove,
-/*
-		.suspend =	smo8800_suspend,
-		.resume	 =	smo8800_resume,
-*/
-	},
-	.owner =	THIS_MODULE,
-};
+static acpi_status smo8800_get_resource(struct acpi_resource *resource, void *context)
+{
+	if (resource->type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
+		struct acpi_resource_extended_irq *irq;
+		u32 *device_irq = context;
 
+		irq = &resource->data.extended_irq;
+		*device_irq = irq->interrupts[0];
+	}
 
-static const struct file_operations smo8800_misc_fops = {
-	.owner	 = THIS_MODULE,
-	.read	 = smo8800_misc_read,
-	.open	 = smo8800_misc_open,
-	.release = smo8800_misc_release,
-};
+	return AE_OK;
+}
 
+static void smo8800_enum_resources(struct acpi_device *device)
+{
+	acpi_status status;
+
+	status = acpi_walk_resources(device->handle, METHOD_NAME__CRS,
+				     smo8800_get_resource, &smo8800_dev.irq);
+	if (ACPI_FAILURE(status))
+		printk(KERN_DEBUG DRIVER_NAME ": Error getting resources\n");
+}
 
 static int smo8800_misc_open(struct inode *inode, struct file *file)
 {
@@ -126,9 +118,9 @@ static ssize_t smo8800_misc_read(struct file *file, char __user *buf,
 	add_wait_queue(&smo_data->misc_wait, &wait);
 	while (true) {
 		set_current_state(TASK_INTERRUPTIBLE);
-//		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count);
+/*		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d\n", smo_data->count); */
 		data = atomic_xchg(&smo_data->count, 0);
-//		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data);
+/*		printk(KERN_DEBUG DRIVER_NAME ": COUNT %d DATA %d\n", smo_data->count, data); */
 		if (data) {
 			break;
 		}
@@ -164,44 +156,6 @@ out:
 	return retval;
 }
 
-static irqreturn_t smo8800_interrupt_quick(int irq, void *data)
-{
-	struct smo8800 *smo = data;
-	atomic_inc(&smo->count);
-	wake_up_interruptible(&smo->misc_wait);
-	return IRQ_WAKE_THREAD;
-}
-
-
-static irqreturn_t smo8800_interrupt_thread(int irq, void *data)
-{
-	printk(KERN_DEBUG DRIVER_NAME ": Detected free fall\n");
-	return IRQ_HANDLED;
-}
-
-static acpi_status smo8800_get_resource(struct acpi_resource *resource, void *context)
-{
-	if (resource->type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
-		struct acpi_resource_extended_irq *irq;
-		u32 *device_irq = context;
-
-		irq = &resource->data.extended_irq;
-		*device_irq = irq->interrupts[0];
-	}
-
-	return AE_OK;
-}
-
-static void smo8800_enum_resources(struct acpi_device *device)
-{
-	acpi_status status;
-
-	status = acpi_walk_resources(device->handle, METHOD_NAME__CRS,
-				     smo8800_get_resource, &smo8800_dev.irq);
-	if (ACPI_FAILURE(status))
-		printk(KERN_DEBUG DRIVER_NAME ": Error getting resources\n");
-}
-
 static int smo8800_add(struct acpi_device *device)
 {
 	int err;
@@ -230,6 +184,42 @@ out:
 	return err;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
+static int smo8800_remove(struct acpi_device *device)
+#else
+static int smo8800_remove(struct acpi_device *device, int type)
+#endif
+{
+	if (smo8800_dev.irq)
+		free_irq(smo8800_dev.irq, &smo8800_dev);
+	return 0;
+}
+
+static const struct acpi_device_id acc_device_ids[] = {
+	{ "SMO8800", 0 },
+	{ "", 0 },
+};
+
+MODULE_DEVICE_TABLE(acpi, acc_device_ids);
+
+static struct acpi_driver latitude_acc_driver = {
+	.name =		DRIVER_NAME,
+	.class =	"Latitude",
+	.ids =		acc_device_ids,
+	.ops =		{
+		.add =		smo8800_add,
+		.remove =	smo8800_remove,
+	},
+	.owner =	THIS_MODULE,
+};
+
+static const struct file_operations smo8800_misc_fops = {
+	.owner	 = THIS_MODULE,
+	.read	 = smo8800_misc_read,
+	.open	 = smo8800_misc_open,
+	.release = smo8800_misc_release,
+};
+
 static int __init smo8800_init(void)
 {
 	int result = 0;
@@ -250,32 +240,6 @@ static int __init smo8800_init(void)
 
 	return 0;
 }
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
-static int smo8800_remove(struct acpi_device *device)
-#else
-static int smo8800_remove(struct acpi_device *device, int type)
-#endif
-{
-	if (smo8800_dev.irq)
-		free_irq(smo8800_dev.irq, &smo8800_dev);
-	return 0;
-}
-
-#ifdef CONFIG_PM
-static int smo8800_suspend(struct acpi_device *device, pm_message_t state)
-{
-	return 0;
-}
-
-static int smo8800_resume(struct acpi_device *device)
-{
-	return 0;
-}
-#else
-#define smo8800_suspend NULL
-#define smo8800_resume NULL
-#endif
 
 static void __exit smo8800_exit(void)
 {
