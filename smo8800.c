@@ -23,6 +23,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/version.h>
+#include <linux/acpi.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 #include <linux/interrupt.h>
@@ -31,7 +33,11 @@
 #define DRIVER_NAME	"smo8800"
 
 static int smo8800_add(struct acpi_device *device);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
+static int smo8800_remove(struct acpi_device *device);
+#else
 static int smo8800_remove(struct acpi_device *device, int type);
+#endif
 static int smo8800_suspend(struct acpi_device *device, pm_message_t state);
 static int smo8800_resume(struct acpi_device *device);
 static int smo8800_misc_open(struct inode *inode, struct file *file);
@@ -245,7 +251,11 @@ static int __init smo8800_init(void)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
+static int smo8800_remove(struct acpi_device *device)
+#else
 static int smo8800_remove(struct acpi_device *device, int type)
+#endif
 {
 	if (smo8800_dev.irq)
 		free_irq(smo8800_dev.irq, &smo8800_dev);
