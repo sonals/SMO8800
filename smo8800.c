@@ -197,6 +197,7 @@ static int smo8800_remove(struct acpi_device *device, int type)
 
 static const struct acpi_device_id acc_device_ids[] = {
 	{ "SMO8800", 0 },
+	{ "SMO8810", 0 },
 	{ "", 0 },
 };
 
