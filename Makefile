@@ -2,6 +2,7 @@
 # Makefile for sensor chip drivers.
 #
 
+
 obj-m	:= smo8800.o
 
 PWD	:= $(shell pwd)
